@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Configuration ESP32</title>
+    <style>
+        /* --- CSS GLOBALE --- */
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #f2f2f2;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+        }
+
+        /* --- STYLES DES CARTES --- */
+        .card {
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 400px;
+            overflow: hidden;
+            position: relative;
+            /* Animation d'apparition */
+            animation: slideUp 0.4s ease-out;
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Utilitaire pour cacher les sections */
+        .hidden {
+            display: none !important;
+        }
+
+        /* --- TABS --- */
+        .tab-header {
+            display: flex;
+            background-color: #eee;
+            border-bottom: 1px solid #ddd;
+        }
+
+        .tab-btn {
+            flex: 1;
+            padding: 15px;
+            border: none;
+            background: none;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 500;
+            color: #666;
+            outline: none;
+            transition: 0.3s;
+        }
+
+        .tab-btn:hover {
+            background-color: #e2e2e2;
+        }
+
+        .tab-btn.active {
+            background-color: white;
+            color: #007bff;
+            border-top: 3px solid #007bff;
+            font-weight: bold;
+        }
+
+        /* --- FORMULAIRE --- */
+        .form-container {
+            padding: 20px;
+        }
+
+        .tab-content {
+            display: none;
+            animation: fadeIn 0.3s;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+
+            to {
+                opacity: 1;
+            }
+        }
+
+        label {
+            font-size: 14px;
+            font-weight: 600;
+            color: #333;
+            display: block;
+            margin-top: 15px;
+            margin-bottom: 5px;
+        }
+
+        .card-title {
+            text-align: center;
+            margin: 20px 0 10px 0;
+            color: #333;
+        }
+
+        /* --- INPUTS --- */
+        .input-wrapper {
+            position: relative;
+            width: 100%;
+        }
+
+        input[type="text"],
+        input[type="password"] {
+            width: 100%;
+            padding: 12px;
+            padding-right: 40px;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            box-sizing: border-box;
+            font-size: 14px;
+            transition: border 0.3s;
+        }
+
+        input:focus {
+            border-color: #007bff;
+            outline: none;
+        }
+
+        /* Erreurs de validation */
+        .input-error {
+            border-color: #dc3545 !important;
+            background-color: #fff8f8;
+        }
+
+        .error-msg {
+            display: block;
+            color: #dc3545;
+            font-size: 12px;
+            margin-top: 4px;
+            min-height: 15px;
+        }
+
+        .login-error {
+            color: #dc3545;
+            text-align: center;
+            font-weight: bold;
+            margin-bottom: 10px;
+            min-height: 20px;
+        }
+
+        /* --- ICÔNE OEIL --- */
+        .eye-icon {
+            position: absolute;
+            right: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            cursor: pointer;
+            width: 20px;
+            height: 20px;
+            fill: #888;
+        }
+
+        .eye-icon:hover {
+            fill: #007bff;
+        }
+
+        /* --- BOUTONS --- */
+        .actions {
+            margin-top: 25px;
+            border-top: 1px solid #eee;
+            padding-top: 20px;
+        }
+
+        input[type="submit"] {
+            width: 100%;
+            background-color: #007bff;
+            color: white;
+            padding: 14px;
+            border: none;
+            border-radius: 6px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        input[type="submit"]:hover {
+            background-color: #0056b3;
+        }
+
+        /* --- POPUP LOADING --- */
+        .overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+            flex-direction: column;
+        }
+
+        .loader-box {
+            background: white;
+            padding: 20px 40px;
+            border-radius: 8px;
+            text-align: center;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #007bff;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 15px auto;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        .loading-text {
+            color: #333;
+            font-weight: 600;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="loadingOverlay" class="overlay">
+        <div class="loader-box">
+            <div class="spinner"></div>
+            <div id="loadingMessage" class="loading-text">Chargement...</div>
+        </div>
+    </div>
+
+    <div id="login-card" class="card">
+        <h2 class="card-title">Authentification</h2>
+        <div class="form-container">
+            <div id="login-error-msg" class="login-error"></div>
+            <form id="formLogin">
+                <label>Nom d'utilisateur</label>
+                <input type="text" name="username" placeholder="admin">
+
+                <label>Mot de passe</label>
+                <div class="input-wrapper">
+                    <input type="password" id="login_pass" name="password" placeholder="***">
+                    <svg class="eye-icon" onclick="togglePass('login_pass', this)" viewBox="0 0 24 24">
+                        <path
+                            d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z" />
+                    </svg>
+                </div>
+
+                <div class="actions">
+                    <input type="submit" value="Se connecter">
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="config-card" class="card hidden">
+        <div class="tab-header">
+            <button class="tab-btn active" onclick="openTab('device')">Device info</button>
+            <button class="tab-btn" onclick="openTab('mqtt')">MQTT info</button>
+        </div>
+
+        <div class="form-container">
+
+            <div id="device" class="tab-content active">
+                <form id="formDevice">
+                    <label>Device Name</label>
+                    <p>Analystic Button</p>
+
+                    <label>Device Password</label>
+                    <div class="input-wrapper">
+                        <input type="password" id="dev_pass" name="dev_pass" placeholder="***">
+                        <svg class="eye-icon" onclick="togglePass('dev_pass', this)" viewBox="0 0 24 24">
+                            <path
+                                d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z" />
+                        </svg>
+                    </div>
+                    <span id="error-dev_pass" class="error-msg"></span>
+
+                    <label>Access Point Password</label>
+                    <div class="input-wrapper">
+                        <input type="password" id="ap_pass" name="ap_pass" placeholder="***">
+                        <svg class="eye-icon" onclick="togglePass('ap_pass', this)" viewBox="0 0 24 24">
+                            <path
+                                d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z" />
+                        </svg>
+                    </div>
+                    <span id="error-ap_pass" class="error-msg"></span>
+
+                    <div class="actions">
+                        <input type="submit" value="Enregistrer Device Info">
+                    </div>
+                </form>
+            </div>
+
+            <div id="mqtt" class="tab-content">
+                <form id="formMqtt">
+                    <label>Device Username</label>
+                    <input type="text" name="mqtt_user" id="mqtt_user">
+
+                    <label>MQTT Password</label>
+                    <div class="input-wrapper">
+                        <input type="password" id="mqtt_pass" name="mqtt_pass" placeholder="***">
+                        <svg class="eye-icon" onclick="togglePass('mqtt_pass', this)" viewBox="0 0 24 24">
+                            <path
+                                d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z" />
+                        </svg>
+                    </div>
+                    <span id="error-mqtt_pass" class="error-msg"></span>
+
+                    <label>Broker IP</label>
+                    <input type="text" name="broker_ip" id="broker_ip">
+                    <label>Wifi SSID</label>
+                    <input type="text" name="ssid" id="wifi_ssid">
+
+                    <label>Wifi Password</label>
+                    <div class="input-wrapper">
+                        <input type="password" id="wifi_pass" name="pass" placeholder="***">
+                        <svg class="eye-icon" onclick="togglePass('wifi_pass', this)" viewBox="0 0 24 24">
+                            <path
+                                d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z" />
+                        </svg>
+                    </div>
+                    <span id="error-wifi_pass" class="error-msg"></span>
+
+                    <div class="actions">
+                        <input type="submit" class="btn-mqtt" value="Enregistrer MQTT & Wifi">
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script>
+
+        function getShareInfo() {
+            fetch("/share_info")
+            .then(response => {
+                if (!response.ok) {
+                    console.log("Error while getting data ...");
+                }
+
+                return response.json()
+            })
+            .then(data => {
+                console.log(data);
+                document.getElementById("mqtt_user").value = data["mqtt_name"] ?? "";
+                document.getElementById("mqtt_pass").value = data["mqtt_pass"] ?? "";
+                document.getElementById("broker_ip").value = data["broker_ip"] ?? "";
+                document.getElementById("wifi_ssid").value = data["wifi_ssid"] ?? "";
+                document.getElementById("wifi_pass").value = data["wifi_pass"] ?? "";
+            })
+            .catch(error => {
+                console.log(error);
+            })
+        }
+
+        function getDeviceInfo() {
+            fetch("/dev_info")
+            .then(response => {
+                if (!response.ok) {
+                    console.log("Error while getting data ...");
+                }
+
+                return response.json()
+            })
+            .then(data => {
+                console.log(data);
+                document.getElementById("dev_pass").value = data["device_password"] ?? "";
+                document.getElementById("ap_pass").value = data["ap_password"] ?? "";
+            })
+            .catch(error => {
+                console.log(error);
+            })
+        }
+
+        function togglePass(inputId, iconElement) {
+            var input = document.getElementById(inputId);
+            var isPass = input.type === "password";
+
+            if (isPass) {
+                input.type = "text";
+                iconElement.innerHTML = '<path d="M12 7c2.76 0 5 2.24 5 5 0 .65-.13 1.26-.36 1.83l2.92 2.92c1.51-1.26 2.7-2.89 3.43-4.75-1.73-4.39-6-7.5-11-7.5-1.4 0-2.74.25-3.98.7l2.16 2.16C10.74 7.13 11.35 7 12 7zM2 4.27l2.28 2.28.46.46C3.08 8.3 1.78 10.02 1 12c1.73 4.39 6 7.5 11 7.5 1.55 0 3.03-.3 4.38-.84l.42.42L19.73 22 21 20.73 3.27 3 2 4.27zM7.53 9.8l1.55 1.55c-.05.21-.08.43-.08.65 0 1.66 1.34 3 3 3 .22 0 .44-.03.65-.08l1.55 1.55c-.67.33-1.41.53-2.2.53-2.76 0-5-2.24-5-5 0-.79.2-1.53.53-2.2zm4.31-.78l3.15 3.15.02-.16c0-1.66-1.34-3-3-3l-.17.01z"/>';
+                iconElement.style.fill = "#333";
+            } else {
+                input.type = "password";
+                iconElement.innerHTML = '<path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/>';
+                iconElement.style.fill = "#888";
+            }
+        }
+
+        function openTab(tabName) {
+            var contents = document.getElementsByClassName("tab-content");
+            for (var i = 0; i < contents.length; i++) contents[i].classList.remove("active");
+            var btns = document.getElementsByClassName("tab-btn");
+            for (var i = 0; i < btns.length; i++) btns[i].classList.remove("active");
+            document.getElementById(tabName).classList.add("active");
+            event.currentTarget.classList.add("active");
+
+            if (tabName === 'device') getDeviceInfo();
+            if (tabName === 'mqtt') getShareInfo();
+        }
+
+        function setLoading(isActive, text = "Chargement...") {
+            const overlay = document.getElementById('loadingOverlay');
+            document.getElementById('loadingMessage').textContent = text;
+            overlay.style.display = isActive ? 'flex' : 'none';
+        }
+
+        // === LOGIQUE DE VALIDATION (Min 8 caractères) ===
+        function validateForm(form) {
+            let isValid = true;
+            const passwords = form.querySelectorAll('input[type="password"]');
+            passwords.forEach(input => {
+                const errorSpan = form.querySelector('#error-' + input.id);
+                // Réinitialiser
+                input.classList.remove('input-error');
+                if (errorSpan) errorSpan.textContent = '';
+                // Vérifier longueur > 0 et < 8
+                if (input.value.length >= 0 && input.value.length < 8) {
+                    isValid = false;
+                    input.classList.add('input-error');
+                    if (errorSpan) errorSpan.textContent = 'Min. 8 caractères requis.';
+                }
+            });
+            return isValid;
+        }
+
+        // === LOGIQUE D'AUTHENTIFICATION ===
+        document.getElementById('formLogin').addEventListener('submit', function (e) {
+            e.preventDefault();
+
+            // Effacer messages d'erreur précédents
+            document.getElementById('login-error-msg').textContent = "";
+
+            setLoading(true, "Authentification...");
+
+            const formData = new FormData(e.target);
+            const data = Object.fromEntries(formData.entries());
+
+            console.log(data);
+
+            return fetch("/login", {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                },
+                body: JSON.stringify(data)
+            })
+                .then(response => {
+                    setLoading(false);
+
+                    console.log(response);
+
+                    if (response.ok) {
+                        document.getElementById('login-card').classList.add('hidden');
+                        document.getElementById('config-card').classList.remove('hidden');
+
+                        getDeviceInfo();
+                    } else {
+                        document.getElementById('login-error-msg').textContent = "Identifiants incorrects.";
+                    }
+                })
+                .catch(error => {
+                    setLoading(false);
+
+                    document.getElementById('login-error-msg').textContent = "Erreur de connexion au serveur.";
+                    console.error(error);
+                });
+        });
+
+        function handleConfigSubmit(event, endpoint) {
+            event.preventDefault();
+            const form = event.target;
+
+            if (!validateForm(form)) return;
+
+            setLoading(true, "Enregistrement...");
+
+            const formData = new FormData(form);
+            const data = Object.fromEntries(formData.entries());
+
+            console.log(data);
+
+            fetch(endpoint, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                },
+                body: JSON.stringify(data)
+            })
+                .then(response => {
+                    if (response.status === 401) {
+                        setLoading(false);
+                        alert("Session expirée. Veuillez vous reconnecter.");
+                        window.location.reload();
+                        return;
+                    }
+                    if (response.ok) {
+                        setLoading(true, "Sauvegardé !");
+                        setTimeout(() => { setLoading(false); }, 1500);
+                    } else {
+                        setLoading(true, "Erreur serveur !");
+                        setTimeout(() => { setLoading(false); }, 2000);
+                    }
+                })
+                .catch(error => {
+                    setLoading(true, "Erreur réseau");
+                    setTimeout(() => { setLoading(false); }, 2000);
+                });
+        }
+
+        // Attacher les écouteurs pour les formulaires de config
+        document.getElementById('formDevice').addEventListener('submit', function (e) {
+            handleConfigSubmit(e, '/save_device');
+        });
+
+        document.getElementById('formMqtt').addEventListener('submit', function (e) {
+            handleConfigSubmit(e, '/save_share');
+        });
+
+    </script>
+</body>
+
+</html>
