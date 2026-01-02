@@ -1,0 +1,146 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 210 20% 98%;
+    --foreground: 215 25% 15%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 215 25% 15%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 215 25% 15%;
+
+    --primary: 210 60% 25%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 210 30% 94%;
+    --secondary-foreground: 210 60% 25%;
+
+    --muted: 210 20% 96%;
+    --muted-foreground: 215 15% 50%;
+
+    --accent: 199 89% 48%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+
+    --success: 142 76% 36%;
+    --success-foreground: 0 0% 100%;
+
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 100%;
+
+    --border: 210 20% 90%;
+    --input: 210 20% 90%;
+    --ring: 210 60% 25%;
+
+    --radius: 0.5rem;
+
+    /* QMS specific tokens */
+    --display-bg: 210 60% 12%;
+    --display-foreground: 0 0% 100%;
+    --display-accent: 199 89% 60%;
+    --display-number: 45 100% 51%;
+    
+    --counter-online: 142 76% 36%;
+    --counter-offline: 0 0% 60%;
+    
+    --kpi-gradient-start: 210 60% 25%;
+    --kpi-gradient-end: 199 89% 48%;
+
+    /* Sidebar specific tokens */
+    --sidebar-background: 210 60% 15%;
+    --sidebar-foreground: 210 20% 90%;
+    --sidebar-primary: 199 89% 60%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 210 50% 22%;
+    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-border: 210 40% 25%;
+    --sidebar-ring: 199 89% 60%;
+  }
+
+  .dark {
+    --background: 215 25% 10%;
+    --foreground: 210 20% 98%;
+
+    --card: 215 25% 13%;
+    --card-foreground: 210 20% 98%;
+
+    --popover: 215 25% 13%;
+    --popover-foreground: 210 20% 98%;
+
+    --primary: 199 89% 60%;
+    --primary-foreground: 215 25% 10%;
+
+    --secondary: 215 25% 18%;
+    --secondary-foreground: 210 20% 98%;
+
+    --muted: 215 25% 18%;
+    --muted-foreground: 215 15% 60%;
+
+    --accent: 199 89% 48%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 215 25% 20%;
+    --input: 215 25% 20%;
+    --ring: 199 89% 60%;
+
+    --sidebar-background: 215 30% 8%;
+    --sidebar-foreground: 210 20% 90%;
+    --sidebar-primary: 199 89% 60%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 215 30% 15%;
+    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-border: 215 30% 18%;
+    --sidebar-ring: 199 89% 60%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    font-family: 'Inter', sans-serif;
+  }
+}
+
+@layer components {
+  .ticket-number {
+    font-family: 'JetBrains Mono', monospace;
+  }
+  
+  .gradient-primary {
+    background: linear-gradient(135deg, hsl(var(--kpi-gradient-start)), hsl(var(--kpi-gradient-end)));
+  }
+  
+  .display-glow {
+    box-shadow: 0 0 10px hsl(var(--primary) / 0.3);
+  }
+  
+  .ticker-scroll {
+    animation: ticker 30s linear infinite;
+  }
+  
+  @keyframes ticker {
+    0% { transform: translateX(100%); }
+    100% { transform: translateX(-100%); }
+  }
+  
+  .pulse-call {
+    animation: pulse-call 2s ease-in-out infinite;
+  }
+  
+  @keyframes pulse-call {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+  }
+}
