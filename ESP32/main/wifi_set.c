@@ -6,10 +6,15 @@
 #include "lwip/err.h"
 #include "lwip/sys.h"
 #include "web_server.h"
+#include "esp_event.h"
 #include "memory.h"
 #include "pins.h"
+#include "websocket.h"
 
 const char *TAG = "WIFI-QMS";
+
+esp_netif_t *netif_sta = NULL;
+esp_netif_t *netif_ap = NULL;
 
 #define MAX_RETRY_STA 5
 
@@ -24,6 +29,7 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t e
         case WIFI_EVENT_STA_START:
             esp_wifi_connect();
             set_leds_level(true);
+
             break;
 
         case WIFI_EVENT_STA_DISCONNECTED:
@@ -54,6 +60,7 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t e
         if (event_id == IP_EVENT_STA_GOT_IP)
         {
             retry_wifi_sta = 0;
+            websocket_app_start();
         }
     }
 }
@@ -62,8 +69,6 @@ void wifi_ap_mode()
 {
 
     esp_wifi_stop();
-
-    esp_netif_create_default_wifi_ap();
 
     char pass[16] = {0};
     const char wifi_ssid[16] = "BUTTON QSM";
@@ -93,7 +98,7 @@ void wifi_ap_mode()
 
 void wifi_sta_mode(char *wifi_ssid, char *pass)
 {
-    esp_netif_create_default_wifi_sta();
+    esp_wifi_stop();
 
     wifi_config_t wifi_config = {
         .sta = {
@@ -111,6 +116,9 @@ void wifi_sta_mode(char *wifi_ssid, char *pass)
 
 void wifi_setup()
 {
+
+    netif_sta = esp_netif_create_default_wifi_sta();
+    netif_ap  = esp_netif_create_default_wifi_ap();
 
     wifi_init_config_t config = WIFI_INIT_CONFIG_DEFAULT();
     ESP_ERROR_CHECK(esp_wifi_init(&config));

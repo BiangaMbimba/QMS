@@ -10,6 +10,7 @@
 #include "esp_wifi.h"
 #include "wifi_set.h"
 #include "pins.h"
+#include "websocket.h"
 
 static const char *TAG = "QMS-LOGS";
 
@@ -48,6 +49,7 @@ void app_main(void)
         {
             if (mode == WIFI_MODE_STA)
             {
+                websocket_send_message("{\"message\": \"NEXT\"}");
                 ESP_LOGI(TAG, "Button pressed -> Send increment ");
             }
         }

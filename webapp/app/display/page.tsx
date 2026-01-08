@@ -2,7 +2,7 @@
 
 import { Maximize2, Minimize2 } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
-import { invoke } from "@tauri-apps/api/core"
+import { useTauriEvents } from '@/context/TauriL;istener';
 import { listen } from '@tauri-apps/api/event';
 
 export interface TicketCall {
@@ -26,10 +26,12 @@ export default function Display() {
 
     const [isFullscreen, setIsFullscreen] = useState(false);
     const mainRef = useRef(null);
+    const {guichet, compteur} = useTauriEvents();
 
     const [logs, setLogs] = useState<string[]>([]);
 
     const toggleFullScreen = async () => {
+
         try {
             if (!document.fullscreenElement) {
                 if (mainRef.current) {
@@ -47,17 +49,6 @@ export default function Display() {
         }
     };
 
-    useEffect(() => {
-        const unlistenPromise = listen<string>('nouveau-message', (event) => {
-            console.log(event.payload);
-            // setLogs((prev) => [...prev, `Reçu : ${event.payload}`]);
-        });
-
-        return () => {
-            unlistenPromise.then((f) => f());
-        };
-    }, []);
-
     return (
         <>
             <main className="flex-1 flex flex-col relative" ref={mainRef}>
@@ -65,7 +56,7 @@ export default function Display() {
                     <div className="flex-1 flex flex-col items-center justify-center p-8 relative overflow-hidden">
                         <div className="relative z-10 display-glow rounded-2xl border-2 border-primary py-10 px-20 mb-8 flex flex-col gap-8 min-w-[350px]">
                             <p className="ticket-number text-[10rem] font-bold text-display-number leading-none pulse-call text-center">
-                                120
+                                {compteur}
                             </p>
                         </div>
                         <div className="relative z-10 flex flex-col items-center">
@@ -73,7 +64,7 @@ export default function Display() {
                                 Please proceed to
                             </span>
                             <span className="text-5xl font-bold text-foreground tracking-wide">
-                                COUNTER 01
+                                {guichet}
                             </span>
                         </div>
                     </div>
