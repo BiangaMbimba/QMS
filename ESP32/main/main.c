@@ -11,8 +11,21 @@
 #include "wifi_set.h"
 #include "pins.h"
 #include "websocket.h"
+#include "esp_pm.h"
 
 static const char *TAG = "QMS-LOGS";
+
+// Configure Automatic Light Sleep
+void setup_power_management() {
+    // 1. Configure Power Management Lock
+    // This allows the CPU to lower its frequency or stop when idle.
+    esp_pm_config_t pm_config = {
+        .max_freq_mhz = 240, // Max CPU speed
+        .min_freq_mhz = 80,  // Min CPU speed (lowers when idle)
+        .light_sleep_enable = true // Enable automatic light sleep
+    };
+    ESP_ERROR_CHECK(esp_pm_configure(&pm_config));
+}
 
 void app_main(void)
 {
@@ -33,10 +46,14 @@ void app_main(void)
     }
     ESP_ERROR_CHECK(nvs);
 
+    setup_power_management();
+
     ESP_ERROR_CHECK(esp_netif_init());
     ESP_ERROR_CHECK(esp_event_loop_create_default());
 
     wifi_setup();
+
+    esp_wifi_set_ps(WIFI_PS_MIN_MODEM);
 
     while (true)
     {
@@ -49,7 +66,7 @@ void app_main(void)
         {
             if (mode == WIFI_MODE_STA)
             {
-                websocket_send_message("{\"message\": \"NEXT\"}");
+                http_send_next_command();
                 ESP_LOGI(TAG, "Button pressed -> Send increment ");
             }
         }

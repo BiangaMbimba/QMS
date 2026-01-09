@@ -4,8 +4,8 @@
 #include "esp_system.h"
 #include "driver/gpio.h"
 
-#define GOOD_LED 41
-#define CONF_LED 40
+#define GOOD_LED 42
+#define CONF_LED 41
 #define PUSH_BUTTON 39
 #define POWER_BUTTON 5
 

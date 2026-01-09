@@ -1,19 +1,27 @@
-use futures_util::{SinkExt, StreamExt};
 use local_ip_address::local_ip;
 use rand::distributions::Alphanumeric;
 use rand::{thread_rng, Rng};
 use rusqlite::{params, Connection};
 use serde::{Deserialize, Serialize};
-use std::sync::Arc;
-use std::sync::Mutex;
-use tauri::State;
 use tauri::{Emitter, Manager};
-use tokio::net::TcpListener;
-use tokio_tungstenite::accept_hdr_async;
-use tokio_tungstenite::tungstenite::handshake::server::{ErrorResponse, Request, Response};
-use tokio_tungstenite::tungstenite::http::StatusCode;
-use tokio_tungstenite::tungstenite::Message;
 use tts::Tts;
+use axum::{
+    extract::{Query, State},
+    response::sse::{Event, KeepAlive, Sse},
+    routing::{get, post},
+    Json, Router,
+};
+use std::{collections::HashMap, sync::{Arc, Mutex}, time::Duration};
+use tokio::sync::broadcast;
+use futures::stream::Stream;
+
+struct AppState {
+    db: Arc<Database>,
+    app_handle: tauri::AppHandle,
+    tx: broadcast::Sender<String>,
+    tts: Arc<Mutex<Option<Tts>>>,
+}
+
 
 #[derive(serde::Serialize, Clone)]
 struct EtatFile {
@@ -35,9 +43,74 @@ pub struct Annonce {
     active: bool,
 }
 
-#[derive(Deserialize, Debug)]
-struct EspMessage {
-    message: String,
+async fn next_handler(
+    State(state): State<Arc<AppState>>,
+    Query(params): Query<HashMap<String, String>>,
+) -> Json<String> {
+    
+    // 1. Authentication
+    let token = params.get("token").map(|s| s.as_str()).unwrap_or("");
+    let device_info = state.db.get_device_info(token);
+
+    if let Some((_id, device_name)) = device_info {
+        println!("🟢 Button pressed by: {}", device_name);
+
+        // 2. Logic (Increment DB)
+        let nouveau_numero = state.db.incrementer(&device_name).compteur;
+
+        // 3. Emit to Tauri Frontend
+        let event_payload = EtatFile {
+            guichet: device_name.clone(),
+            compteur: nouveau_numero,
+        };
+        let _ = state.app_handle.emit("nouveau-message", &event_payload);
+
+        // 4. TTS Speak
+        let text_to_speak = format!("Client numéro {}, guichet {}", nouveau_numero, device_name);
+        if let Ok(mut tts_guard) = state.tts.lock() {
+            if let Some(tts) = tts_guard.as_mut() {
+                let _ = tts.speak(text_to_speak, true);
+            }
+        }
+
+        // 5. Broadcast update to SSE Screens
+        // We send a JSON string so screens can parse it
+        let broadcast_msg = serde_json::json!({
+            "guichet": device_name,
+            "compteur": nouveau_numero
+        }).to_string();
+        
+        let _ = state.tx.send(broadcast_msg);
+
+        // 6. Response to Button (ESP32)
+        return Json("OK".into());
+    }
+
+    Json("FORBIDDEN".into())
+}
+
+// --- HANDLER 2: SCREENS (SSE GET /events) ---
+// usage: GET http://ip:8765/events
+async fn sse_handler(
+    State(state): State<Arc<AppState>>,
+) -> Sse<impl Stream<Item = Result<Event, axum::Error>>> {
+    
+    println!("✅ New Screen Connected to SSE");
+
+    // Subscribe to the broadcast channel
+    let mut rx = state.tx.subscribe();
+
+    // Create a stream that listens to the channel
+    let stream = async_stream::stream! {
+        // Send initial "Keep Alive" or Welcome message
+        yield Ok(Event::default().data("connected"));
+
+        while let Ok(msg) = rx.recv().await {
+            yield Ok(Event::default().data(msg));
+        }
+    };
+
+    Sse::new(stream).keep_alive(KeepAlive::default())
 }
 
 struct Database {
@@ -211,133 +284,57 @@ pub fn run() {
     tauri::Builder::default()
         .setup(|app| {
             let app_handle = app.handle().clone();
-
             let db = std::sync::Arc::new(Database::init());
             app.manage(db.clone());
 
-            tauri::async_runtime::spawn(async move {
-                let addr = "0.0.0.0:8765";
-                let listener = TcpListener::bind(&addr)
-                    .await
-                    .expect("Impossible de lancer le serveur");
-
-                println!(
-                    "🚀 Serveur WebSocket sécurisé en écoute sur : ws://{}",
-                    addr
-                );
-
-                while let Ok((stream, _)) = listener.accept().await {
-                    let app_handle = app_handle.clone();
-                    let db_clone = db.clone();
-
-                    tokio::spawn(async move {
-                        let device_name_captured = std::sync::Arc::new(Mutex::new(None));
-                        let device_name_writer = device_name_captured.clone();
-
-                        let db_callback_clone = db_clone.clone();
-
-                        let callback = move |req: &Request, response: Response| {
-                            let uri = req.uri();
-                            let query = uri.query().unwrap_or("");
-
-                            let token = query
-                                .split('&')
-                                .find(|p| p.starts_with("token="))
-                                .map(|p| p.trim_start_matches("token="))
-                                .unwrap_or("");
-
-                            if let Some((_id, name)) = db_callback_clone.get_device_info(token) {
-                                println!("✅ Connexion validée pour : {}", name);
-
-                                *device_name_writer.lock().unwrap() = Some(name);
-
-                                Ok(response)
-                            } else {
-                                let mut err = ErrorResponse::new(Some("Token Invalide".into()));
-                                *err.status_mut() = StatusCode::FORBIDDEN;
-                                Err(err)
-                            }
-                        };
-
-                        let mut tts = match Tts::default() {
-                            Ok(t) => Some(t),
-                            Err(e) => {
-                                eprintln!("Error initializing TTS: {}", e);
-                                None
-                            }
-                        };
-
-                        // --- CONNEXION ---
-                        match accept_hdr_async(stream, callback).await {
-                            Ok(ws_stream) => {
-                                let device_name = {
-                                    let lock = device_name_captured.lock().unwrap();
-                                    lock.clone()
-                                };
-
-                                if device_name.is_none() {
-                                    return;
-                                }
-                                let current_device_name = device_name.unwrap();
-                                println!("💾 Session active pour : {}", current_device_name);
-
-                                let (mut write, mut read) = ws_stream.split();
-
-                                while let Some(msg) = read.next().await {
-                                    match msg {
-                                        Ok(Message::Text(text)) => {
-                                            if let Ok(payload) =
-                                                serde_json::from_str::<EspMessage>(&text)
-                                            {
-                                                if payload.message == "NEXT" {
-                                                    println!(
-                                                        "🟢 Action NEXT reçue de {}",
-                                                        current_device_name
-                                                    );
-
-                                                    let nouveau_numero = db_clone
-                                                        .incrementer(&current_device_name)
-                                                        .compteur;
-
-                                                    let event_payload = EtatFile {
-                                                        guichet: current_device_name.clone(),
-                                                        compteur: nouveau_numero,
-                                                    };
-                                                    app_handle
-                                                        .emit("nouveau-message", event_payload)
-                                                        .unwrap();
-
-                                                    let text_to_speak = format!(
-                                                        "Client numéro {}, guichet {}",
-                                                        nouveau_numero, current_device_name
-                                                    );
-
-                                                    if let Some(ref mut speech_engine) = tts {
-                                                        // .speak(text, interrupt_current_speech)
-                                                        let _ = speech_engine
-                                                            .speak(text_to_speak, true);
-                                                    }
-
-                                                    let reponse =
-                                                        format!("{}", current_device_name);
-                                                    if let Err(_) =
-                                                        write.send(Message::Text(reponse)).await
-                                                    {
-                                                        break;
-                                                    }
-                                                }
-                                            }
-                                        }
-                                        Ok(Message::Close(_)) => break,
-                                        Err(_) => break,
-                                        _ => {}
-                                    }
-                                }
-                            }
-                            Err(e) => println!("Echec connexion : {}", e),
-                        }
-                    });
+            // Initialize TTS once (Shared across threads)
+            let tts_instance = match Tts::default() {
+                Ok(t) => Some(t),
+                Err(e) => {
+                    eprintln!("Error initializing TTS: {}", e);
+                    None
                 }
+            };
+            let tts = Arc::new(Mutex::new(tts_instance));
+
+            // Create Broadcast Channel (Capacity 100)
+            let (tx, _rx) = broadcast::channel(100);
+
+            let heartbeat_tx = tx.clone();
+            tauri::async_runtime::spawn(async move {
+                loop {
+                    tokio::time::sleep(Duration::from_secs(5)).await;
+                    // We send a "PING" message. 
+                    // The ESP32 will see: "data: PING"
+                    if let Err(e) = heartbeat_tx.send("PING".to_string()) {
+                        // If no clients are connected, this might error, which is fine
+                        eprintln!("Heartbeat skipped (no listeners): {}", e);
+                    }
+                }
+            });
+
+            // Create State to pass to handlers
+            let state = Arc::new(AppState {
+                db: db.clone(),
+                app_handle,
+                tx,
+                tts,
+            });
+
+            // Spawn the Web Server
+            tauri::async_runtime::spawn(async move {
+                // Route Definition
+                let app = Router::new()
+                    .route("/events", get(sse_handler)) // For SCREENS (SSE)
+                    .route("/next", post(next_handler)) // For BUTTONS (POST)
+                    .with_state(state);
+
+                let addr = "0.0.0.0:8765";
+                let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
+                
+                println!("🚀 Server SSE/HTTP ready on http://{}", addr);
+                
+                axum::serve(listener, app).await.unwrap();
             });
 
             Ok(())
@@ -378,27 +375,27 @@ fn get_counter_state(state: tauri::State<std::sync::Arc<Database>>) -> EtatFile 
 }
 
 #[tauri::command]
-fn get_all_devices(state: State<Arc<Database>>) -> Vec<Device> {
+fn get_all_devices(state: tauri::State<Arc<Database>>) -> Vec<Device> {
     state.get_all_devices()
 }
 
 #[tauri::command]
-fn get_annonces(state: State<Arc<Database>>) -> Vec<Annonce> {
+fn get_annonces(state: tauri::State<Arc<Database>>) -> Vec<Annonce> {
     state.get_annonces()
 }
 
 #[tauri::command]
-fn add_annonce(state: State<Arc<Database>>, message: String) -> Result<(), String> {
+fn add_annonce(state: tauri::State<Arc<Database>>, message: String) -> Result<(), String> {
     state.add_annonce(message)
 }
 
 #[tauri::command]
-fn delete_annonce(state: State<Arc<Database>>, id: i32) -> Result<(), String> {
+fn delete_annonce(state: tauri::State<Arc<Database>>, id: i32) -> Result<(), String> {
     state.delete_annonce(id)
 }
 
 #[tauri::command]
-fn register_device(state: State<Arc<Database>>, name: String) -> Result<(), String> {
+fn register_device(state: tauri::State<Arc<Database>>, name: String) -> Result<(), String> {
     println!("{}", name);
     state.register_device(name)
 }

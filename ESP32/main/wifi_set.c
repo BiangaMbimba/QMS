@@ -60,7 +60,7 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t e
         if (event_id == IP_EVENT_STA_GOT_IP)
         {
             retry_wifi_sta = 0;
-            websocket_app_start();
+            http_app_start_listener();
         }
     }
 }
