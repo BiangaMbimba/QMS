@@ -9,7 +9,8 @@
 #include "esp_event.h"
 #include "memory.h"
 #include "pins.h"
-#include "websocket.h"
+#include "http_app.h"
+#include "default.h"
 
 const char *TAG = "WIFI-QMS";
 
@@ -73,7 +74,7 @@ void wifi_ap_mode()
     char pass[16] = {0};
     const char wifi_ssid[16] = "BUTTON QSM";
 
-    nvs_get_info("device_info", "ap_pass", pass, sizeof(pass));
+    nvs_get_info(DEVICE_INFO_MEMORY_REFERENCE, "ap_pass", pass, sizeof(pass));
 
     wifi_config_t wifi_config = {
         .ap = {
@@ -86,7 +87,8 @@ void wifi_ap_mode()
 
     if (strlen(pass) == 0)
     {
-        wifi_config.ap.authmode = WIFI_AUTH_OPEN;
+        strncpy((char *)wifi_config.ap.password, DEFAULT_AP_PASSWORD, sizeof(wifi_config.ap.password));
+        nvs_set_info(DEVICE_INFO_MEMORY_REFERENCE, "ap_pass", DEFAULT_AP_PASSWORD);
     }
 
     esp_wifi_set_mode(WIFI_MODE_AP);
@@ -132,8 +134,8 @@ void wifi_setup()
     char ssid[16] = {0};
     char pass[16] = {0};
 
-    esp_err_t err_ssid = nvs_get_info("mqtt_info", "wifi_ssid", ssid, sizeof(ssid));
-    esp_err_t err_pass = nvs_get_info("mqtt_info", "wifi_pass", pass, sizeof(pass));
+    esp_err_t err_ssid = nvs_get_info(SSE_INFO_MEMORY_REFERENCE, "wifi_ssid", ssid, sizeof(ssid));
+    esp_err_t err_pass = nvs_get_info(SSE_INFO_MEMORY_REFERENCE, "wifi_pass", pass, sizeof(pass));
 
     if (err_ssid == ESP_OK && strlen(ssid) > 0 && err_pass == ESP_OK && strlen(pass) > 0)
         has_valid_creds = true;

@@ -11,10 +11,9 @@
 #include "memory.h"
 #include "esp_random.h"
 #include "cJSON.h"
+#include "default.h"
 
 static const char *TAG = "WEBSERVER-LOGS";
-static const char *default_admin = "admin";
-static const char *default_password = "admin123";
 
 static char current_session_id[33] = {0}; // Stores the active token
 extern const uint8_t index_html_start[] asm("_binary_index_html_start");
@@ -129,7 +128,7 @@ static esp_err_t device_info_get_handler(httpd_req_t *req)
     char dev_pass[16] = {0};
     char ap_pass[16] = {0};
 
-    if (nvs_get_info("device_info", "dev_pass", dev_pass, sizeof(dev_pass)) != ESP_OK || nvs_get_info("device_info", "ap_pass", ap_pass, sizeof(ap_pass)) == ESP_FAIL)
+    if (nvs_get_info(DEVICE_INFO_MEMORY_REFERENCE, "dev_pass", dev_pass, sizeof(dev_pass)) != ESP_OK || nvs_get_info(DEVICE_INFO_MEMORY_REFERENCE, "ap_pass", ap_pass, sizeof(ap_pass)) == ESP_FAIL)
     {
         ESP_LOGE(TAG, "Failed to read the device info ...");
         httpd_resp_send_500(req);
@@ -157,16 +156,14 @@ static esp_err_t device_info_get_handler(httpd_req_t *req)
 /**
  * @brief To send mqtt info in to the config page
  */
-static esp_err_t share_info_get_handler(httpd_req_t *req)
+static esp_err_t http_info_get_handler(httpd_req_t *req)
 {
-
-    char mqtt_user[16] = {0};
-    char mqtt_pass[16] = {0};
+    char token[16] = {0};
     char broker_ip[16] = {0};
     char wifi_ssid[16] = {0};
     char wifi_pass[16] = {0};
 
-    if (nvs_get_info("mqtt_info", "mqtt_name", mqtt_user, sizeof(mqtt_user)) == ESP_FAIL || nvs_get_info("mqtt_info", "mqtt_pass", mqtt_pass, sizeof(mqtt_pass)) == ESP_FAIL || nvs_get_info("mqtt_info", "broker_ip", broker_ip, sizeof(broker_ip)) == ESP_FAIL || nvs_get_info("mqtt_info", "wifi_ssid", wifi_ssid, sizeof(wifi_ssid)) == ESP_FAIL || nvs_get_info("mqtt_info", "wifi_pass", wifi_pass, sizeof(wifi_pass)) == ESP_FAIL)
+    if (nvs_get_info(SSE_INFO_MEMORY_REFERENCE, "token", token, sizeof(token)) == ESP_FAIL || nvs_get_info(SSE_INFO_MEMORY_REFERENCE, "broker_ip", broker_ip, sizeof(broker_ip)) == ESP_FAIL || nvs_get_info(SSE_INFO_MEMORY_REFERENCE, "wifi_ssid", wifi_ssid, sizeof(wifi_ssid)) == ESP_FAIL || nvs_get_info(SSE_INFO_MEMORY_REFERENCE, "wifi_pass", wifi_pass, sizeof(wifi_pass)) == ESP_FAIL)
     {
         ESP_LOGE(TAG, "Failed to read the device info ...");
         httpd_resp_send_500(req);
@@ -175,11 +172,8 @@ static esp_err_t share_info_get_handler(httpd_req_t *req)
 
     cJSON *data = cJSON_CreateObject();
 
-    if (strlen(mqtt_user))
-        cJSON_AddStringToObject(data, "mqtt_name", mqtt_user);
-
-    if (strlen(mqtt_pass))
-        cJSON_AddStringToObject(data, "mqtt_pass", mqtt_pass);
+    if (strlen(token))
+        cJSON_AddStringToObject(data, "token", token);
 
     if (strlen(broker_ip))
         cJSON_AddStringToObject(data, "broker_ip", broker_ip);
@@ -226,7 +220,7 @@ static esp_err_t login_post_handler(httpd_req_t *req)
     // get data in nvs
     char device_password[16] = {0};
 
-    esp_err_t devide_err = nvs_get_info("device_info", "dev_pass", device_password, sizeof(device_password));
+    esp_err_t devide_err = nvs_get_info(DEVICE_INFO_MEMORY_REFERENCE, "dev_pass", device_password, sizeof(device_password));
 
     if (devide_err == ESP_OK || devide_err == ESP_ERR_NVS_NOT_FOUND)
     {
@@ -236,7 +230,7 @@ static esp_err_t login_post_handler(httpd_req_t *req)
 
         if (strlen(device_password) > 0)
         {
-            if (strcmp(user_item->valuestring, default_admin) != 0 || strcmp(device_password, pass_item->valuestring) != 0)
+            if (strcmp(user_item->valuestring, DEFAULT_ADMIN) != 0 || strcmp(device_password, pass_item->valuestring) != 0)
             {
                 httpd_resp_send_err(req, HTTPD_404_NOT_FOUND, "Either username or password is not correct!");
                 return ESP_FAIL;
@@ -246,9 +240,9 @@ static esp_err_t login_post_handler(httpd_req_t *req)
         {
             if (devide_err == ESP_ERR_NVS_NOT_FOUND)
             {
-                nvs_set_info("device_info", "dev_pass", default_password);
+                nvs_set_info(DEVICE_INFO_MEMORY_REFERENCE, "dev_pass", DEFAULT_ADMIN_PASSWORD);
 
-                if (strcmp(user_item->valuestring, "admin") != 0 || strcmp(pass_item->valuestring, default_password) != 0)
+                if (strcmp(user_item->valuestring, DEFAULT_ADMIN) != 0 || strcmp(pass_item->valuestring, DEFAULT_ADMIN_PASSWORD) != 0)
                 {
                     httpd_resp_send_err(req, HTTPD_404_NOT_FOUND, "Either username or password is not correct!");
                     return ESP_FAIL;
@@ -305,21 +299,21 @@ static esp_err_t device_save_post_handler(httpd_req_t *req)
     char m_dev_pass[16] = {0};
     char m_ap_pass[16] = {0};
 
-    if (nvs_get_info("device_info", "dev_pass", m_dev_pass, sizeof(m_dev_pass)) != ESP_OK)
+    if (nvs_get_info(DEVICE_INFO_MEMORY_REFERENCE, "dev_pass", m_dev_pass, sizeof(m_dev_pass)) != ESP_OK)
     {
         ESP_LOGE(TAG, "Failed to read the device password");
         httpd_resp_send_500(req);
         return ESP_FAIL;
     }
 
-    if (nvs_get_info("device_info", "ap_pass", m_ap_pass, sizeof(m_ap_pass)) == ESP_FAIL)
+    if (nvs_get_info(DEVICE_INFO_MEMORY_REFERENCE, "ap_pass", m_ap_pass, sizeof(m_ap_pass)) == ESP_FAIL)
     {
         ESP_LOGE(TAG, "Failed to read the ap password");
         httpd_resp_send_500(req);
         return ESP_FAIL;
     }
 
-    if (cmp_and_store("device_info", "dev_pass", dev_pass->valuestring, m_dev_pass) != ESP_OK)
+    if (cmp_and_store(DEVICE_INFO_MEMORY_REFERENCE, "dev_pass", dev_pass->valuestring, m_dev_pass) != ESP_OK)
     {
         httpd_resp_send_500(req);
         return ESP_FAIL;
@@ -327,7 +321,7 @@ static esp_err_t device_save_post_handler(httpd_req_t *req)
     else
         isSmtChange = true;
 
-    if (cmp_and_store("device_info", "ap_pass", ap_pass->valuestring, m_ap_pass) != ESP_OK)
+    if (cmp_and_store(DEVICE_INFO_MEMORY_REFERENCE, "ap_pass", ap_pass->valuestring, m_ap_pass) != ESP_OK)
     {
         httpd_resp_send_500(req);
         return ESP_FAIL;
@@ -354,7 +348,7 @@ static esp_err_t device_save_post_handler(httpd_req_t *req)
 /**
  * @brief To change MQTT info
  */
-esp_err_t share_save_post_handler(httpd_req_t *req)
+esp_err_t http_info_save_post_handler(httpd_req_t *req)
 {
 
     bool isSmtChange = false;
@@ -375,27 +369,28 @@ esp_err_t share_save_post_handler(httpd_req_t *req)
         return ESP_FAIL;
     }
 
-    cJSON *mqtt_user = cJSON_GetObjectItemCaseSensitive(data, "mqtt_user");
-    cJSON *mqtt_pass = cJSON_GetObjectItemCaseSensitive(data, "mqtt_pass");
+    cJSON *token = cJSON_GetObjectItemCaseSensitive(data, "token");
     cJSON *broker_ip = cJSON_GetObjectItemCaseSensitive(data, "broker_ip");
     cJSON *wifi_ssid = cJSON_GetObjectItemCaseSensitive(data, "ssid");
     cJSON *wifi_pass = cJSON_GetObjectItemCaseSensitive(data, "pass");
 
-    char m_mqtt_user[16] = {0};
-    char m_mqtt_pass[16] = {0};
+    char m_token[16] = {0};
     char m_broker_ip[16] = {0};
     char m_wifi_ssid[16] = {0};
     char m_wifi_pass[16] = {0};
 
     if (
-        nvs_get_info("mqtt_info", "mqtt_name", m_mqtt_user, sizeof(m_mqtt_user)) == ESP_FAIL || nvs_get_info("mqtt_info", "mqtt_pass", m_mqtt_pass, sizeof(m_mqtt_pass)) == ESP_FAIL || nvs_get_info("mqtt_info", "broker_ip", m_broker_ip, sizeof(m_broker_ip)) == ESP_FAIL || nvs_get_info("mqtt_info", "wifi_ssid", m_wifi_ssid, sizeof(m_wifi_ssid)) == ESP_FAIL || nvs_get_info("mqtt_info", "wifi_pass", m_wifi_pass, sizeof(m_wifi_pass)) == ESP_FAIL)
+       nvs_get_info(SSE_INFO_MEMORY_REFERENCE, "token", m_token, sizeof(m_token)) == ESP_FAIL || nvs_get_info(SSE_INFO_MEMORY_REFERENCE, "broker_ip", m_broker_ip, sizeof(m_broker_ip)) == ESP_FAIL || nvs_get_info(SSE_INFO_MEMORY_REFERENCE, "wifi_ssid", m_wifi_ssid, sizeof(m_wifi_ssid)) == ESP_FAIL || nvs_get_info(SSE_INFO_MEMORY_REFERENCE, "wifi_pass", m_wifi_pass, sizeof(m_wifi_pass)) == ESP_FAIL)
     {
         ESP_LOGE(TAG, "Failed to read mqtt info ");
         httpd_resp_send_500(req);
         return ESP_FAIL;
     }
 
-    if (cmp_and_store("mqtt_info", "mqtt_name", mqtt_user->valuestring, m_mqtt_user) != ESP_OK)
+    else
+        isSmtChange = true;
+
+    if (cmp_and_store(SSE_INFO_MEMORY_REFERENCE, "token", token->valuestring, m_token) != ESP_OK)
     {
         httpd_resp_send_500(req);
         return ESP_FAIL;
@@ -403,7 +398,7 @@ esp_err_t share_save_post_handler(httpd_req_t *req)
     else
         isSmtChange = true;
 
-    if (cmp_and_store("mqtt_info", "mqtt_pass", mqtt_pass->valuestring, m_mqtt_pass) != ESP_OK)
+    if (cmp_and_store(SSE_INFO_MEMORY_REFERENCE, "broker_ip", broker_ip->valuestring, m_broker_ip) != ESP_OK)
     {
         httpd_resp_send_500(req);
         return ESP_FAIL;
@@ -411,7 +406,7 @@ esp_err_t share_save_post_handler(httpd_req_t *req)
     else
         isSmtChange = true;
 
-    if (cmp_and_store("mqtt_info", "broker_ip", broker_ip->valuestring, m_broker_ip) != ESP_OK)
+    if (cmp_and_store(SSE_INFO_MEMORY_REFERENCE, "wifi_pass", wifi_pass->valuestring, m_wifi_pass) != ESP_OK)
     {
         httpd_resp_send_500(req);
         return ESP_FAIL;
@@ -419,15 +414,7 @@ esp_err_t share_save_post_handler(httpd_req_t *req)
     else
         isSmtChange = true;
 
-    if (cmp_and_store("mqtt_info", "wifi_pass", wifi_pass->valuestring, m_wifi_pass) != ESP_OK)
-    {
-        httpd_resp_send_500(req);
-        return ESP_FAIL;
-    }
-    else
-        isSmtChange = true;
-
-    if (cmp_and_store("mqtt_info", "wifi_ssid", wifi_ssid->valuestring, m_wifi_ssid) != ESP_OK)
+    if (cmp_and_store(SSE_INFO_MEMORY_REFERENCE, "wifi_ssid", wifi_ssid->valuestring, m_wifi_ssid) != ESP_OK)
     {
         httpd_resp_send_500(req);
         return ESP_FAIL;
@@ -479,9 +466,9 @@ void start_web_server(void)
         httpd_register_uri_handler(server, &uri_get_device_info);
 
         httpd_uri_t uri_get_share_info = {
-            .uri = "/share_info",
+            .uri = "/http_info",
             .method = HTTP_GET,
-            .handler = share_info_get_handler,
+            .handler = http_info_get_handler,
             .user_ctx = NULL};
 
         httpd_register_uri_handler(server, &uri_get_share_info);
@@ -497,9 +484,9 @@ void start_web_server(void)
         httpd_register_uri_handler(server, &uri_save_device_info);
 
         httpd_uri_t uri_save_share_info = {
-            .uri = "/save_share",
+            .uri = "/save_http",
             .method = HTTP_POST,
-            .handler = share_save_post_handler,
+            .handler = http_info_save_post_handler,
             .user_ctx = NULL};
 
         httpd_register_uri_handler(server, &uri_save_share_info);

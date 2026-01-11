@@ -10,19 +10,16 @@
 #include "esp_wifi.h"
 #include "wifi_set.h"
 #include "pins.h"
-#include "websocket.h"
+#include "http_app.h"
 #include "esp_pm.h"
 
 static const char *TAG = "QMS-LOGS";
 
-// Configure Automatic Light Sleep
 void setup_power_management() {
-    // 1. Configure Power Management Lock
-    // This allows the CPU to lower its frequency or stop when idle.
     esp_pm_config_t pm_config = {
-        .max_freq_mhz = 240, // Max CPU speed
-        .min_freq_mhz = 80,  // Min CPU speed (lowers when idle)
-        .light_sleep_enable = true // Enable automatic light sleep
+        .max_freq_mhz = 240,
+        .min_freq_mhz = 80,
+        .light_sleep_enable = true
     };
     ESP_ERROR_CHECK(esp_pm_configure(&pm_config));
 }

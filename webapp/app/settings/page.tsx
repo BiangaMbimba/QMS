@@ -8,22 +8,13 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
-import { Copy, Delete, Key, Plus, Settings2, Wifi, WifiOff } from "lucide-react";
+import { Check, Copy, Delete, Key, Megaphone, Palette, Pencil, Plus, Settings2, Trash2, Wifi, WifiOff, X } from "lucide-react";
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { invoke } from '@tauri-apps/api/core';
-import { listen } from '@tauri-apps/api/event';
-import { execPath } from "process";
-import { error } from "console";
-
-
-export interface Device {
-    id: number;
-    name: string;
-    ipAddress?: string;
-    status?: "connected" | "disconnected";
-    token: string;
-}
+import { Textarea } from "@/components/ui/textarea";
+import { Announcement, Device } from "@/lib/mocData";
+import { useAnnouncementContext } from "@/context/AnnoncementsContext";
 
 export default function Settings() {
 
@@ -34,30 +25,27 @@ export default function Settings() {
 
     const [ipAddr, setIpAddr] = useState<string>("");
 
-    const registerDevice = async () => {
+    const { announcements, setAnnouncements, refreshAnnouncements } = useAnnouncementContext();
+    const [newAnnouncement, setNewAnnouncement] = useState("");
+    const [editingId, setEditingId] = useState<string | null>(null);
+    const [editingText, setEditingText] = useState("");
 
-        if (newDeviceName.length > 3) {
-            const register = await invoke("register_device", { name: newDeviceName });
-            console.log(register);
-            setNewDeviceName("");
+    async function getAlldevices() {
+        try {
+            const get_devices = await invoke<Device[]>("get_all_devices");
+            console.log(get_devices);
+            setDevices(get_devices);
+        } catch (e) {
+            console.log(e);
         }
-        else {
-            alert("Device name must contain at least 3 characters");
-        }
+
     }
-
-    const handleCopy = (text: string | null) => {
-        if (!text) return; 
-        navigator.clipboard.writeText(text);
-        toast.info("Copier", {description: "Text is succefully copied !"})
-    };
 
     useEffect(() => {
         async function getIpAddr() {
             try {
                 const machineIp = await invoke<string>("get_machine_ip");
                 console.log(machineIp);
-
                 setIpAddr(machineIp);
             } catch (e) {
                 console.log('Error while getting ip address ... ');
@@ -65,21 +53,11 @@ export default function Settings() {
             }
         }
 
-        async function getAlldevices() {
-            try {
-                const get_devices = await invoke<Device[]>("get_all_devices");
-                console.log(get_devices);
-                setDevices(get_devices);
-            } catch (e) {
-                console.log(e);
-            }
-
-        }
-
         getIpAddr();
         getAlldevices();
 
     }, [])
+
 
     return (
         <main className="p-8 space-y-8 animate-fade-in w-full">
@@ -130,7 +108,7 @@ export default function Settings() {
                                             {device.status === "connected" ? (
                                                 <Wifi className="w-3 h-3" />
                                             ) : (
-                                                <WifiOff className="w-3 h-3" />
+                                                <><WifiOff className="w-3 h-3" /> disconnected</>
                                             )}
                                             {device.status}
                                         </Badge>
@@ -145,7 +123,11 @@ export default function Settings() {
                                                 variant="ghost"
                                                 size="icon"
                                                 className="h-7 w-7"
-                                                onClick={() => handleCopy(device.token)}
+                                                onClick={() => {
+                                                    if (!device.token) return;
+                                                    navigator.clipboard.writeText(device.token);
+                                                    toast.info("Copier", { description: "Text is succefully copied !" })
+                                                }}
                                             >
                                                 <Copy className="w-3 h-3" />
                                             </Button>
@@ -156,16 +138,35 @@ export default function Settings() {
                                         <Button
                                             variant="outline"
                                             size="sm"
-                                            className="gap-2"
+                                            className="gap-2 text-destructive hover:text-destructive"
+                                            onClick={async () => {
+                                                try {
+                                                    await invoke("delete_device", { id: device.id })
+                                                    getAlldevices();
+                                                    toast.success("Device deleted", {
+                                                        description: "Device has been deleted."
+                                                    })
+                                                } catch (e) {
+                                                    console.error(e);
+                                                    toast.error("Fail to delete", {
+                                                        description: "Decive has not been deleted ..."
+                                                    })
+                                                }
+
+                                            }}
                                         >
-                                            <Delete className="w-3 h-3" />
-                                            Delete
+                                            <Trash2 className="w-3 h-3" />
                                         </Button>
                                     </TableCell>
                                 </TableRow>
                             ))}
                         </TableBody>
                     </Table>
+                    {devices.length === 0 && (
+                        <p className="text-center text-muted-foreground py-4">
+                            No device yet. Add one below.
+                        </p>
+                    )}
                 </CardContent>
             </Card>
 
@@ -190,7 +191,30 @@ export default function Settings() {
                                 onChange={(e) => setNewDeviceName(e.target.value)}
                             />
                         </div>
-                        <Button type="submit" className="gap-2" onClick={registerDevice}>
+                        <Button type="submit" className="gap-2" onClick={async (e) => {
+                            e.preventDefault();
+                            if (newDeviceName.trim().length > 3) {
+                                try {
+                                    await invoke("register_device", { name: newDeviceName.trim() });
+                                    getAlldevices();
+                                    toast.success("Device added", {
+                                        description: "Device has been added."
+                                    })
+                                    setNewDeviceName("");
+                                } catch (e) {
+                                    console.error(e);
+                                    toast.error("Fail to add", {
+                                        description: "Fail to add a device ..."
+                                    })
+
+                                }
+                            }
+                            else {
+                                toast.info("Fail to add", {
+                                    description: "Device name must be more than 3 characters ..."
+                                })
+                            }
+                        }}>
                             <Plus className="w-4 h-4" />
                             Add Device
                         </Button>
@@ -222,32 +246,195 @@ export default function Settings() {
                             onCheckedChange={setSoundEnabled}
                         />
                     </div>
+                </CardContent>
+            </Card>
 
-                    {/* <div className="border-t border-border pt-6 space-y-2">
-            <Label htmlFor="orgName" className="flex items-center gap-2">
-              <Building2 className="w-4 h-4" />
-              Organization Name
-            </Label>
-            <div className="flex gap-4">
-              <Input
-                id="orgName"
-                value={orgName}
-                onChange={(e) => setOrgName(e.target.value)}
-                className="max-w-md"
-              />
-              <Button
-                variant="outline"
-                onClick={() =>
-                  toast({
-                    title: "Settings Saved",
-                    description: "Organization name has been updated.",
-                  })
-                }
-              >
-                Save Changes
-              </Button>
-            </div>
-          </div> */}
+            <Card>
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                        <Megaphone className="w-5 h-5 text-accent" />
+                        Announcements
+                    </CardTitle>
+                    <CardDescription>
+                        Manage ticker announcements displayed on the public screen
+                    </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    {/* Add New Announcement */}
+                    <form
+                        onSubmit={async (e) => {
+                            e.preventDefault();
+                            if (!newAnnouncement.trim()) {
+                                toast.error("Error", {
+                                    description: "Please enter an announcement.",
+                                });
+                                return;
+                            }
+                            const newItem: Announcement = {
+                                id: `ann-${Date.now()}`,
+                                message: newAnnouncement.trim(),
+                                active: true,
+                            };
+                            setAnnouncements((prev) => [...prev, newItem]);
+                            try {
+                                await invoke("add_annonce", { message: newItem.message });
+                                refreshAnnouncements();
+                                setNewAnnouncement("");
+                                toast.success("Announcement Added", {
+                                    description: "New announcement has been added to the ticker.",
+                                });
+
+                            } catch (e) {
+                                console.error(e);
+                                toast.error("Failed to add", {
+                                    description: "New announcement has not been added ...",
+                                });
+                            }
+                        }}
+                        className="flex gap-4 items-end"
+                    >
+                        <div className="flex-1 space-y-2">
+                            <Label htmlFor="newAnnouncement">New Announcement</Label>
+                            <Textarea
+                                id="newAnnouncement"
+                                placeholder="Enter announcement text..."
+                                value={newAnnouncement}
+                                onChange={(e) => setNewAnnouncement(e.target.value)}
+                                className="min-h-[60px]"
+                            />
+                        </div>
+                        <Button type="submit" className="gap-2">
+                            <Plus className="w-4 h-4" />
+                            Add
+                        </Button>
+                    </form>
+
+                    {/* Announcements List */}
+                    <div className="border-t border-border pt-4 space-y-2">
+                        {announcements.map((announcement) => (
+                            <div
+                                key={announcement.id}
+                                className={cn(
+                                    "flex items-center gap-3 p-3 rounded-lg border transition-colors",
+                                    announcement.active ? "bg-muted/30 border-border" : "bg-muted/10 border-muted"
+                                )}
+                            >
+                                <Switch
+                                    checked={announcement.active}
+                                    onCheckedChange={async (checked) => {
+                                        setAnnouncements((prev) =>
+                                            prev.map((a) =>
+                                                a.id === announcement.id ? { ...a, active: checked } : a
+                                            )
+                                        );
+
+                                        try {
+                                            await invoke("set_annonce_active", { id: announcement.id, isActive: checked });
+                                            refreshAnnouncements();
+                                        } catch (e) {
+                                            console.error(e);
+                                        }
+                                    }}
+                                />
+                                {editingId === announcement.id ? (
+                                    <div className="flex-1 flex gap-2">
+                                        <Textarea
+                                            value={editingText}
+                                            onChange={(e) => setEditingText(e.target.value)}
+                                            className="min-h-[40px] flex-1"
+                                            autoFocus
+                                        />
+                                        <Button
+                                            size="icon"
+                                            variant="ghost"
+                                            className="h-8 w-8 text-success hover:text-success"
+                                            onClick={async () => {
+                                                setAnnouncements((prev) =>
+                                                    prev.map((a) =>
+                                                        a.id === announcement.id ? { ...a, message: editingText } : a
+                                                    )
+                                                );
+
+                                                try {
+                                                    await invoke("update_annonce_message", { id: announcement.id, message: editingText });
+                                                    refreshAnnouncements();
+                                                    setEditingId(null);
+                                                    toast.success("Announcement Updated", {
+                                                        description: "Changes have been saved.",
+                                                    });
+                                                } catch (e) {
+                                                    console.error(e);
+                                                    toast.error("Failed to update", {
+                                                        description: "Changes have not been saved ...",
+                                                    });
+                                                }
+                                            }}
+                                        >
+                                            <Check className="w-4 h-4" />
+                                        </Button>
+                                        <Button
+                                            size="icon"
+                                            variant="ghost"
+                                            className="h-8 w-8"
+                                            onClick={() => setEditingId(null)}
+                                        >
+                                            <X className="w-4 h-4" />
+                                        </Button>
+                                    </div>
+                                ) : (
+                                    <>
+                                        <p className={cn(
+                                            "flex-1 text-sm",
+                                            !announcement.active && "text-muted-foreground"
+                                        )}>
+                                            {announcement.message}
+                                        </p>
+                                        <Button
+                                            size="icon"
+                                            variant="ghost"
+                                            className="h-8 w-8"
+                                            onClick={() => {
+                                                setEditingId(announcement.id);
+                                                setEditingText(announcement.message);
+                                            }}
+                                        >
+                                            <Pencil className="w-4 h-4" />
+                                        </Button>
+                                        <Button
+                                            size="icon"
+                                            variant="ghost"
+                                            className="h-8 w-8 text-destructive hover:text-destructive"
+                                            onClick={async () => {
+                                                setAnnouncements((prev) =>
+                                                    prev.filter((a) => a.id !== announcement.id)
+                                                );
+
+                                                try {
+                                                    await invoke("delete_annonce", { id: announcement.id });
+                                                    refreshAnnouncements();
+                                                    toast.success("Announcement Deleted", {
+                                                        description: "The announcement has been removed.",
+                                                    });
+                                                } catch (e) {
+                                                    console.error(e);
+                                                    toast.error("Failed to delete", {
+                                                        description: "The announcement has not been removed ...",
+                                                    });
+                                                }
+                                            }}
+                                        >
+                                            <Trash2 className="w-4 h-4" />
+                                        </Button>
+                                    </>
+                                )}
+                            </div>
+                        ))}
+                        {announcements.length === 0 && (
+                            <p className="text-center text-muted-foreground py-4">
+                                No announcements yet. Add one above.
+                            </p>
+                        )}
+                    </div>
                 </CardContent>
             </Card>
         </main>

@@ -4,7 +4,8 @@ import { TooltipProvider } from "@/components/ui/tooltip"; // Installé par shad
 import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
 import SideBar from "@/components/ui/sidebar";
-import { TauriProvider } from "@/context/TauriL;istener";
+import { TauriProvider } from "@/context/TauriListener";
+import { AnnouncementsProvider } from "@/context/AnnoncementsContext";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -35,7 +36,9 @@ export default function RootLayout({
         <TooltipProvider>
           <SideBar />
           <TauriProvider>
-            {children}
+            <AnnouncementsProvider>
+              {children}
+            </AnnouncementsProvider>
           </TauriProvider>
           <Toaster />
         </TooltipProvider>
